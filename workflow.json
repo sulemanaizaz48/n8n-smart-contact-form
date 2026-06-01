@@ -1,0 +1,241 @@
+{
+  "name": "Smart Contact Form",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "Contact-form",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "ea670703-9479-4c8f-a77a-06c8923a114c",
+      "name": "Webhook",
+      "webhookId": "c5a432c7-1280-4b03-8d12-35960ac3d732"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-flash-lite-latest",
+          "mode": "list",
+          "cachedResultName": "models/gemini-flash-lite-latest"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Analyze the user message and extract:\n\n1. category (one word only: sales, support, job, spam, other)\n2. priority (high, medium, low)\n\nRules:\n- If user wants to buy something → sales, high\n- If asking question → support, medium\n- If job related → job, medium\n- If irrelevant → spam, low\n\nReturn ONLY valid JSON. No explanation.\n\nExample:\nMessage: \"I want to buy your service\"\nOutput:\n{\n  \"category\": \"sales\",\n  \"priority\": \"high\"\n}\n\nMessage:  {{ $json.body.message }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "c3de9b21-a28c-4964-aebd-ac8394bde31b",
+      "name": "Message a model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "Kzia6BA6Nrg0dOYe",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: JSON.parse($input.first().json.content.parts[0].text)\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        0
+      ],
+      "id": "97da627a-e26a-475b-81dc-d9410335b4f3",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "tableId": "contacts",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $('Webhook').item.json.body.name }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $('Webhook').item.json.body.email }}"
+            },
+            {
+              "fieldId": "message",
+              "fieldValue": "={{ $('Webhook').item.json.body.message }}"
+            },
+            {
+              "fieldId": "category",
+              "fieldValue": "={{ $json.category }}"
+            },
+            {
+              "fieldId": "priority",
+              "fieldValue": "={{ $json.priority }}"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ $now.setZone('Asia/Karachi').toFormat('yyyy-MM-dd HH:mm:ss') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        768,
+        0
+      ],
+      "id": "124a3bcb-34fb-4722-9959-dc8f036c4e3b",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "lXMPDEGh3s6TT8Lf",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "18101df8-1600-4365-82ec-43bb17e2b4cb",
+              "leftValue": "={{ $json.priority }}",
+              "rightValue": "high",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        976,
+        0
+      ],
+      "id": "c3a80083-c50e-462d-a7fb-140882a9d876",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook').item.json.body.email }}",
+        "subject": "Subject: New High Priority Contact Submission 🚨 ",
+        "emailType": "text",
+        "message": "=You have received a new important message from your website.\n\n👤 Name: {{$json[\"name\"]}}\n📧 Email: {{$json[\"email\"]}}\n💬 Message: \"{{$json[\"message\"]}}\"\n🧠 AI Analysis: - Category: {{$json[\"category\"]}}\nPriority: {{$json[\"priority\"]}}\n\n⚡ Action Required: Please respond to this lead as soon as possible.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1216,
+        -64
+      ],
+      "id": "3e7415c6-1561-4ec7-b08a-cb90e08ed72c",
+      "name": "Send a message",
+      "webhookId": "4ec96252-d0a7-4f91-91d2-e5e9a3a4bb27",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "aaPIVX573gDj6Z90",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "35a3b563-33c6-4632-be83-097c31277524",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "bd4738b7eacd2caeace78a8dd1fc119e24e627bafe776142c927aa62f72eec41"
+  },
+  "id": "bNkA0BlL9Rh06mk1",
+  "tags": []
+}
