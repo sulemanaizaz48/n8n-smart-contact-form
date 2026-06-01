@@ -1,0 +1,5 @@
+return [
+  {
+    json: JSON.parse($input.first().json.content.parts[0].text)
+  }
+];
